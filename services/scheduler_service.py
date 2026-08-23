@@ -7,7 +7,7 @@ from database.task_repository import get_pending_reminders, mark_reminded
 logger = logging.getLogger(__name__)
 
 _bot_app = None
-_poll_interval = 60  # seconds
+_poll_interval = 60
 
 
 def set_bot_app(bot_app):
@@ -37,22 +37,12 @@ async def _check_reminders():
     for task in pending:
         telegram_id = task["telegram_id"]
         title = task["title"]
-        due = task.get("due_datetime", "")
-
-        # Convert due time to Addis Ababa for display
-        try:
-            due_dt = datetime.fromisoformat(due)
-            if due_dt.tzinfo is None:
-                due_dt = due_dt.replace(tzinfo=timezone.utc)
-            from services.timezone_helper import format_eat_full
-            due_str = format_eat_full(due_dt)
-        except (ValueError, TypeError):
-            due_str = due
+        due = task.get("due_datetime", "sometime")
 
         text = (
             f"\u23f0 Task Reminder!\n\n"
             f"\U0001f4cc {title}\n"
-            f"\U0001f4c5 Due: {due_str} EAT"
+            f"\U0001f4c5 Due: {due}"
         )
 
         try:

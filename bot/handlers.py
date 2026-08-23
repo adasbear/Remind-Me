@@ -8,10 +8,7 @@ from services.timezone_helper import (
     format_eat_full,
     format_eat,
     parse_iso_to_eat,
-    utc_to_eat,
     now_eat,
-    EAT,
-    UTC,
 )
 from database.task_repository import (
     upsert_user,
@@ -161,13 +158,13 @@ async def _handle_create(update: Update, telegram_id: int, result):
 
     logger.info("Parsed EAT times: due=%s, reminder=%s", due_eat, reminder_eat)
 
-    # Save to database (converts to UTC internally)
+    # Save to database (stores as device time)
     task = save_task(
         telegram_id=telegram_id,
         title=result.title,
         description=result.description,
-        due_eat=due_eat,
-        reminder_eat=reminder_eat,
+        due_dt=due_eat,
+        reminder_dt=reminder_eat,
     )
 
     due_str = format_eat_full(due_eat)
