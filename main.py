@@ -52,7 +52,7 @@ async def on_startup():
     webhook_url = settings.telegram_webhook_url
     if webhook_url and "placeholder" not in webhook_url:
         try:
-            await application.bot.set_webhook(url=webhook_url, timeout=15)
+            await application.bot.set_webhook(url=webhook_url)
             logger.info("Webhook set to %s", webhook_url)
         except Exception as e:
             logger.warning("Failed to set webhook (you can set it manually): %s", e)
