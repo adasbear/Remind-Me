@@ -81,7 +81,7 @@ def extract_task(user_input: str) -> TaskExtractionResult:
     system_prompt = _build_system_prompt()
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
+        model="gemini-3.5-flash-lite",
         contents=user_input,
         config=GenerateContentConfig(
             system_instruction=system_prompt,
