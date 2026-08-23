@@ -37,6 +37,9 @@ async def on_startup():
     builder = create_bot_application()
     application = builder.build()
 
+    # Must initialize before processing updates
+    await application.initialize()
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("list", list_command))
@@ -57,7 +60,7 @@ async def on_startup():
         except Exception as e:
             logger.warning("Failed to set webhook (you can set it manually): %s", e)
     else:
-        logger.info("No webhook URL configured, skipping auto-set. Set it manually via Telegram API.")
+        logger.info("No webhook URL configured, skipping auto-set.")
 
     await start_scheduler()
     logger.info("TaskNova bot started")
