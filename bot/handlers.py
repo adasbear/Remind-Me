@@ -32,14 +32,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(
-        f"Hello {user.first_name}! I'm your task & reminder assistant.\n\n"
-        "Just tell me what you need to remember:\n"
-        '\u2022 "Remind me to buy groceries tomorrow at 6 PM"\n'
-        '\u2022 "Dentist appointment on Friday at 3 PM"\n'
-        '\u2022 "Call mom in 30 minutes"\n\n'
+        f"Hey {user.first_name}! I'm your task & reminder bot.\n\n"
+        "How to use me:\n"
+        "Just send me a message like:\n\n"
+        '\u2022 Remind me to buy groceries tomorrow at 6 PM\n'
+        '\u2022 Dentist appointment on Friday at 3 PM\n'
+        '\u2022 Call mom in 30 minutes\n'
+        '\u2022 Ping me 30 mins before my meeting\n\n'
+        "I'll understand what you mean and set up the reminder.\n\n"
         "Commands:\n"
-        "/list - See your active tasks\n"
-        "/help - Show this message"
+        "/list \u2014 see your active tasks\n"
+        "/help \u2014 show this message"
     )
 
 
