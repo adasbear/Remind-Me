@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -137,6 +137,9 @@ async def _handle_create(update: Update, telegram_id: int, result):
         )
         return
 
+    logger.info("AI returned: title=%s, due=%s, reminder=%s",
+                result.title, result.due_datetime_iso, result.reminder_datetime_iso)
+
     due_utc = parse_iso_to_utc(result.due_datetime_iso)
     reminder_utc = parse_iso_to_utc(result.reminder_datetime_iso) if result.reminder_datetime_iso else None
 
@@ -146,8 +149,9 @@ async def _handle_create(update: Update, telegram_id: int, result):
 
     # Default reminder: 15 mins before due
     if reminder_utc is None:
-        from datetime import timedelta
         reminder_utc = due_utc - timedelta(minutes=15)
+
+    logger.info("After conversion: due_utc=%s, reminder_utc=%s", due_utc, reminder_utc)
 
     task = save_task(
         telegram_id=telegram_id,
