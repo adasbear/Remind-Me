@@ -3,7 +3,14 @@ services:
     name: tasknova-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: BOT_TOKEN
+      - key: TELEGRAM_BOT_TOKEN
+      - key: TELEGRAM_WEBHOOK_URL
+      - key: SUPABASE_URL
+      - key: SUPABASE_KEY
       - key: GEMINI_API_KEY
+      - key: DEFAULT_TIMEZONE
+        value: "Africa/Addis_Ababa"
+      - key: PORT
+        value: "8000"
