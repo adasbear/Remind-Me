@@ -7,8 +7,11 @@ from services.ai_service import extract_task
 from services.timezone_helper import (
     format_eat_full,
     format_eat,
-    parse_iso_to_utc,
+    parse_iso_to_eat,
+    utc_to_eat,
     now_eat,
+    EAT,
+    UTC,
 )
 from database.task_repository import (
     upsert_user,
@@ -71,10 +74,10 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, task in enumerate(tasks, 1):
         due = task.get("due_datetime", "")
         try:
-            due_dt = datetime.fromisoformat(due)
-            if due_dt.tzinfo is None:
-                due_dt = due_dt.replace(tzinfo=timezone.utc)
-            due_str = format_eat_full(due_dt)
+            dt = datetime.fromisoformat(due)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            due_str = format_eat_full(dt)
         except (ValueError, TypeError):
             due_str = "No due date"
 
@@ -140,34 +143,40 @@ async def _handle_create(update: Update, telegram_id: int, result):
     logger.info("AI returned: title=%s, due=%s, reminder=%s",
                 result.title, result.due_datetime_iso, result.reminder_datetime_iso)
 
-    due_utc = parse_iso_to_utc(result.due_datetime_iso)
-    reminder_utc = parse_iso_to_utc(result.reminder_datetime_iso) if result.reminder_datetime_iso else None
+    # Parse Gemini's response into Addis Ababa time
+    due_eat = parse_iso_to_eat(result.due_datetime_iso)
 
-    if due_utc is None:
+    if result.reminder_datetime_iso:
+        reminder_eat = parse_iso_to_eat(result.reminder_datetime_iso)
+    else:
+        reminder_eat = None
+
+    if due_eat is None:
         await update.message.reply_text("I couldn't understand the date/time. Please try again.")
         return
 
     # Default reminder: 15 mins before due
-    if reminder_utc is None:
-        reminder_utc = due_utc - timedelta(minutes=15)
+    if reminder_eat is None:
+        reminder_eat = due_eat - timedelta(minutes=15)
 
-    logger.info("After conversion: due_utc=%s, reminder_utc=%s", due_utc, reminder_utc)
+    logger.info("Parsed EAT times: due=%s, reminder=%s", due_eat, reminder_eat)
 
+    # Save to database (converts to UTC internally)
     task = save_task(
         telegram_id=telegram_id,
         title=result.title,
         description=result.description,
-        due_datetime=due_utc.isoformat(),
-        reminder_datetime=reminder_utc.isoformat(),
+        due_eat=due_eat,
+        reminder_eat=reminder_eat,
     )
 
-    due_str = format_eat_full(due_utc)
-    reminder_str = format_eat(reminder_utc)
+    due_str = format_eat_full(due_eat)
+    reminder_str = format_eat(reminder_eat)
 
     await update.message.reply_text(
         f"\u2705 Task created!\n\n"
         f"\U0001f4cc {result.title}\n"
-        f"\U0001f4c5 Due: {due_str}\n"
+        f"\U0001f4c5 Due: {due_str} EAT\n"
         f"\u23f0 Reminder at: {reminder_str} EAT"
     )
 
@@ -182,14 +191,14 @@ async def _handle_list(update: Update, telegram_id: int):
     for i, task in enumerate(tasks, 1):
         due = task.get("due_datetime", "")
         try:
-            due_dt = datetime.fromisoformat(due)
-            if due_dt.tzinfo is None:
-                due_dt = due_dt.replace(tzinfo=timezone.utc)
-            due_str = format_eat_full(due_dt)
+            dt = datetime.fromisoformat(due)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            due_str = format_eat_full(dt)
         except (ValueError, TypeError):
             due_str = "No due date"
 
-        lines.append(f"{i}. {task['title']}\n   Due: {due_str}")
+        lines.append(f"{i}. {task['title']}\n   Due: {due_str} EAT")
 
     await update.message.reply_text("\n".join(lines))
 

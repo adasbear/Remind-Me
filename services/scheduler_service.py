@@ -39,7 +39,7 @@ async def _check_reminders():
         title = task["title"]
         due = task.get("due_datetime", "")
 
-        # Format due time in AM/PM
+        # Convert due time to Addis Ababa for display
         try:
             due_dt = datetime.fromisoformat(due)
             if due_dt.tzinfo is None:
@@ -52,7 +52,7 @@ async def _check_reminders():
         text = (
             f"\u23f0 Task Reminder!\n\n"
             f"\U0001f4cc {title}\n"
-            f"\U0001f4c5 Due: {due_str}"
+            f"\U0001f4c5 Due: {due_str} EAT"
         )
 
         try:
