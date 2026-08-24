@@ -36,8 +36,6 @@ async def on_startup():
 
     builder = create_bot_application()
     application = builder.build()
-
-    # Must initialize before processing updates
     await application.initialize()
 
     application.add_handler(CommandHandler("start", start_command))
@@ -51,18 +49,18 @@ async def on_startup():
     bot_app = application
     set_bot_app(application)
 
-    # Set webhook - non-blocking, won't crash the app if it fails
+    # Start APScheduler
+    start_scheduler()
+
+    # Set webhook
     webhook_url = settings.telegram_webhook_url
     if webhook_url and "placeholder" not in webhook_url:
         try:
             await application.bot.set_webhook(url=webhook_url)
             logger.info("Webhook set to %s", webhook_url)
         except Exception as e:
-            logger.warning("Failed to set webhook (you can set it manually): %s", e)
-    else:
-        logger.info("No webhook URL configured, skipping auto-set.")
+            logger.warning("Failed to set webhook: %s", e)
 
-    await start_scheduler()
     logger.info("TaskNova bot started")
 
 

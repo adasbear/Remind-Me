@@ -10,6 +10,7 @@ from services.timezone_helper import (
     parse_iso_to_eat,
     now_eat,
 )
+from services.scheduler_service import schedule_reminder, parse_eat_to_utc
 from database.task_repository import (
     upsert_user,
     save_task,
@@ -18,7 +19,6 @@ from database.task_repository import (
     mark_cancelled,
     find_task_by_title_partial,
 )
-from bot.keyboards import task_action_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +73,10 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             dt = datetime.fromisoformat(due)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=EAT)
             due_str = format_eat_full(dt)
         except (ValueError, TypeError):
-            due_str = "No due date"
+            due_str = due if due else "No due date"
 
         status_emoji = "\u23f0" if task["status"] == "pending" else "\U0001f4e2"
         lines.append(f"{status_emoji} {i}. {task['title']}\n   Due: {due_str}")
@@ -125,8 +125,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _handle_create(update, user.id, result)
         return
 
-    # general_query or fallback
     await update.message.reply_text(result.conversational_reply)
+
+
+EAT = timezone(timedelta(hours=3))
 
 
 async def _handle_create(update: Update, telegram_id: int, result):
@@ -140,7 +142,6 @@ async def _handle_create(update: Update, telegram_id: int, result):
     logger.info("AI returned: title=%s, due=%s, reminder=%s",
                 result.title, result.due_datetime_iso, result.reminder_datetime_iso)
 
-    # Parse Gemini's response into Addis Ababa time
     due_eat = parse_iso_to_eat(result.due_datetime_iso)
 
     if result.reminder_datetime_iso:
@@ -152,19 +153,37 @@ async def _handle_create(update: Update, telegram_id: int, result):
         await update.message.reply_text("I couldn't understand the date/time. Please try again.")
         return
 
-    # Default reminder: 15 mins before due
     if reminder_eat is None:
         reminder_eat = due_eat - timedelta(minutes=15)
 
-    logger.info("Parsed EAT times: due=%s, reminder=%s", due_eat, reminder_eat)
+    # Check if reminder is in the past
+    now = now_eat()
+    if reminder_eat <= now:
+        await update.message.reply_text("That time has already passed. Please choose a future time.")
+        return
 
-    # Save to database (stores as device time)
+    logger.info("Parsed EAT: due=%s, reminder=%s, now=%s", due_eat, reminder_eat, now)
+
+    # Save to database
     task = save_task(
         telegram_id=telegram_id,
         title=result.title,
         description=result.description,
         due_dt=due_eat,
         reminder_dt=reminder_eat,
+    )
+    task_id = task.get("id", "unknown")
+
+    # Schedule APScheduler job
+    reminder_utc = parse_eat_to_utc(reminder_eat)
+    due_display = format_eat_full(due_eat)
+
+    schedule_reminder(
+        task_id=task_id,
+        chat_id=telegram_id,
+        title=result.title,
+        due_display=due_display,
+        run_at_utc=reminder_utc,
     )
 
     due_str = format_eat_full(due_eat)
@@ -173,8 +192,8 @@ async def _handle_create(update: Update, telegram_id: int, result):
     await update.message.reply_text(
         f"\u2705 Task created!\n\n"
         f"\U0001f4cc {result.title}\n"
-        f"\U0001f4c5 Due: {due_str} EAT\n"
-        f"\u23f0 Reminder at: {reminder_str} EAT"
+        f"\U0001f4c5 Due: {due_str}\n"
+        f"\u23f0 Reminder at: {reminder_str}"
     )
 
 
@@ -190,12 +209,12 @@ async def _handle_list(update: Update, telegram_id: int):
         try:
             dt = datetime.fromisoformat(due)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=EAT)
             due_str = format_eat_full(dt)
         except (ValueError, TypeError):
-            due_str = "No due date"
+            due_str = due if due else "No due date"
 
-        lines.append(f"{i}. {task['title']}\n   Due: {due_str} EAT")
+        lines.append(f"{i}. {task['title']}\n   Due: {due_str}")
 
     await update.message.reply_text("\n".join(lines))
 

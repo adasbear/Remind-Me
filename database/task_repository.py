@@ -1,8 +1,7 @@
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 from database.client import get_supabase
-from services.timezone_helper import now_eat, EAT
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +28,19 @@ def save_task(
     due_dt: datetime,
     reminder_dt: datetime,
 ) -> dict:
+    """Save a task. Accepts timezone-aware datetimes."""
     db = get_supabase()
 
-    due_iso = due_dt.isoformat() if due_dt.tzinfo else due_dt.replace(tzinfo=EAT).isoformat()
-    reminder_iso = reminder_dt.isoformat() if reminder_dt.tzinfo else reminder_dt.replace(tzinfo=EAT).isoformat()
+    # Ensure UTC for storage
+    if due_dt.tzinfo:
+        due_iso = due_dt.astimezone(timezone.utc).isoformat()
+    else:
+        due_iso = due_dt.isoformat()
+
+    if reminder_dt.tzinfo:
+        reminder_iso = reminder_dt.astimezone(timezone.utc).isoformat()
+    else:
+        reminder_iso = reminder_dt.isoformat()
 
     logger.info("Saving task: title=%s, due=%s, reminder=%s", title, due_iso, reminder_iso)
 
@@ -47,32 +55,11 @@ def save_task(
     return result.data[0] if result.data else {}
 
 
-def get_pending_reminders() -> list[dict]:
-    db = get_supabase()
-    now_iso = now_eat().isoformat()
-    logger.info("Querying reminders where reminder_datetime <= %s", now_iso)
-
-    result = (
-        db.table("tasks")
-        .select("id, telegram_id, title, description, due_datetime, reminder_datetime")
-        .eq("status", "pending")
-        .lte("reminder_datetime", now_iso)
-        .order("reminder_datetime")
-        .execute()
-    )
-    reminders = result.data or []
-
-    for r in reminders:
-        logger.info("Due task: id=%s, title=%s, reminder=%s", r["id"], r["title"], r["reminder_datetime"])
-
-    return reminders
-
-
 def mark_reminded(task_id: str):
     db = get_supabase()
     db.table("tasks").update({
         "status": "reminded",
-        "updated_at": now_eat().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", task_id).execute()
     logger.info("Marked task %s as reminded", task_id)
 
@@ -81,7 +68,7 @@ def mark_completed(task_id: str):
     db = get_supabase()
     db.table("tasks").update({
         "status": "completed",
-        "updated_at": now_eat().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", task_id).execute()
 
 
@@ -89,7 +76,7 @@ def mark_cancelled(task_id: str):
     db = get_supabase()
     db.table("tasks").update({
         "status": "cancelled",
-        "updated_at": now_eat().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", task_id).execute()
 
 
